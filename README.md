@@ -37,7 +37,7 @@ Play Nintendo DS games online with **2–4 friends** (Windows & macOS) — inclu
 ![Step 5 - In-Game](docs/ingame.png)
 
 ## Quick Tips
-- **Laptops & MacBooks:** Plug in your charger and turn off **Low Power / Battery Saver** mode for smooth **60 FPS**.
+- **Laptops & MacBooks:** Plug in your charger and turn off **Low Power / Battery Saver** mode for better perfomance.
 - **Firewall:** Allow `melonDS` in the Windows / macOS firewall popup when asked.
 
 ## License
