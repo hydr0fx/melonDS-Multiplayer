@@ -1,0 +1,90 @@
+name: macOS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  MELONDS_GIT_BRANCH: ${{ github.ref }}
+  MELONDS_GIT_HASH: ${{ github.sha }}
+  MELONDS_BUILD_PROVIDER: GitHub Actions
+
+jobs:
+  build-macos:
+    name: macOS (arm64)
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out overlay repo
+        uses: actions/checkout@v4
+        with:
+          path: overlay
+
+      - name: Clone melonDS 1.1 base
+        run: |
+          git clone --depth 1 --branch 1.1 https://github.com/melonDS-emu/melonDS.git src_tree
+          cp -R overlay/src/* src_tree/src/
+
+      - name: Install dependencies via Homebrew
+        run: |
+          brew install qt@6 sdl2 libarchive zstd faad2 enet pkgconf cmake ninja dylibbundler
+
+      - name: Configure & Build
+        run: |
+          cd src_tree
+          QT6_PREFIX="$(brew --prefix qt@6)"
+          export PKG_CONFIG_PATH="$(brew --prefix libarchive)/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig:$QT6_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_VCPKG=OFF \
+            -DMACOS_BUNDLE_LIBS=OFF \
+            -DENABLE_LTO_RELEASE=ON \
+            -DMELONDS_EMBED_BUILD_INFO=ON \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_PREFIX_PATH="$QT6_PREFIX"
+          cmake --build build -j4
+
+      - name: Package app bundle
+        run: |
+          cd src_tree/build
+          plutil -replace NSLocalNetworkUsageDescription -string "melonDS needs local network access for multiplayer discovery and netplay." melonDS.app/Contents/Info.plist
+          dylibbundler -od -b -x melonDS.app/Contents/MacOS/melonDS -d melonDS.app/Contents/libs -p @executable_path/../libs/
+          cp -L "$(brew --prefix sdl3)/lib/libSDL3.0.dylib" melonDS.app/Contents/libs/libSDL3.dylib
+          chmod 644 melonDS.app/Contents/libs/libSDL3.dylib
+          install_name_tool -id "@executable_path/../libs/libSDL3.dylib" melonDS.app/Contents/libs/libSDL3.dylib
+          "$(brew --prefix qt@6)/bin/macdeployqt" melonDS.app -always-overwrite
+          otool -L melonDS.app/Contents/MacOS/melonDS
+          if otool -L melonDS.app/Contents/MacOS/melonDS | grep -qE "(/opt/homebrew|/usr/local)"; then
+            echo "ERROR: Unbundled library reference found!" && exit 1
+          fi
+          test -f melonDS.app/Contents/libs/libSDL2-2.0.0.dylib
+          test -f melonDS.app/Contents/libs/libSDL3.dylib
+          find melonDS.app/Contents -type f \( -name "*.dylib" -o -name "*.so" \) -exec codesign --force --sign - {} +
+          find melonDS.app/Contents/Frameworks -type d -name "*.framework" -exec codesign --force --sign - {} +
+          codesign --force --deep --sign - melonDS.app
+          codesign --verify --deep --strict melonDS.app
+          mkdir -p "pkg_stage/BIOS and ROM"
+          printf "Put your DS files here:\n- bios7.bin\n- bios9.bin\n- firmware.bin\n- Your .nds ROM (e.g. Mario Party DS)\n" > "pkg_stage/BIOS and ROM/PUT_BIOS_AND_ROM_HERE.txt"
+          mv melonDS.app pkg_stage/
+          cd pkg_stage
+          zip -r -y ../../../melonDS-Multiplayer-macOS.zip "BIOS and ROM" melonDS.app
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: melonDS-Multiplayer-macOS
+          path: melonDS-Multiplayer-macOS.zip
+          retention-days: 7
+
+      - name: Update GitHub Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.1-netplay-60fps --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload v1.1-netplay-60fps melonDS-Multiplayer-macOS.zip --repo "${{ github.repository }}" --clobber
+          fi
