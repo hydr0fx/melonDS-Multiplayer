@@ -1,0 +1,159 @@
+name: Windows
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# a newer push cancels the older still-running build of the same workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MELONDS_GIT_BRANCH: ${{ github.ref }}
+  MELONDS_GIT_HASH: ${{ github.sha }}
+  MELONDS_BUILD_PROVIDER: GitHub Actions
+
+jobs:
+  build-windows:
+    name: Windows (CLANG64 x64)
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Check out overlay repo
+        uses: actions/checkout@v4
+        with:
+          path: overlay
+
+      - name: Setup MSYS2 CLANG64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            git
+            zip
+            mingw-w64-clang-x86_64-toolchain
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-SDL2
+            mingw-w64-clang-x86_64-libarchive
+            mingw-w64-clang-x86_64-enet
+            mingw-w64-clang-x86_64-zstd
+            mingw-w64-clang-x86_64-faad2
+            mingw-w64-clang-x86_64-qt6-base
+            mingw-w64-clang-x86_64-qt6-svg
+            mingw-w64-clang-x86_64-qt6-multimedia
+            mingw-w64-clang-x86_64-qt6-tools
+
+      - name: Clone melonDS 1.1 base & apply overlay
+        run: |
+          git clone --depth 1 --branch 1.1 https://github.com/melonDS-emu/melonDS.git src_tree
+          cp -R overlay/src/* src_tree/src/
+          sed -i 's/ -s"/"/g' src_tree/CMakeLists.txt
+
+      - name: Configure & Build
+        run: |
+          cd src_tree
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_VCPKG=OFF \
+            -DENABLE_LTO_RELEASE=OFF \
+            -DMELONDS_EMBED_BUILD_INFO=ON \
+            "-DCMAKE_CXX_FLAGS_RELEASE=-O3 -DNDEBUG -include cstdlib"
+          cmake --build build -j4
+
+      - name: Package clean Windows release zip
+        run: |
+          mkdir -p dist/bin "dist/BIOS and ROM"
+          printf "Put your DS files here:\r\n- bios7.bin\r\n- bios9.bin\r\n- firmware.bin\r\n- Your .nds game (e.g. Mario Party DS)\r\n" > "dist/BIOS and ROM/PUT_BIOS_AND_ROM_HERE.txt"
+          cp src_tree/build/melonDS.exe dist/bin/
+          windeployqt6 --release --no-translations --no-compiler-runtime dist/bin/melonDS.exe
+          ldd dist/bin/melonDS.exe | awk '/\/clang64\/bin\// {print $3}' | xargs -I{} cp -n {} dist/bin/
+          for pass in 1 2 3; do
+            for binf in dist/bin/*.dll dist/bin/*/*.dll; do
+              [ -f "$binf" ] || continue
+              ldd "$binf" 2>/dev/null | awk '/\/clang64\/bin\// {print $3}' | xargs -I{} cp -n {} dist/bin/ || true
+            done
+          done
+          test -f dist/bin/melonDS.exe
+          test -f dist/bin/SDL2.dll
+
+          cat << 'EOF' > launcher.c
+          #define WIN32_LEAN_AND_MEAN
+          #include <windows.h>
+          #include <shellapi.h>
+          int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, PWSTR cmdLine, int nCmdShow) {
+              (void)hInst; (void)hPrev;
+              wchar_t dir[MAX_PATH];
+              DWORD len = GetModuleFileNameW(NULL, dir, MAX_PATH);
+              if (len == 0 || len >= MAX_PATH) return 1;
+              while (len > 0 && dir[len - 1] != L'\\' && dir[len - 1] != L'/') len--;
+              if (len > 0) dir[len - 1] = L'\0';
+
+              wchar_t target[MAX_PATH];
+              if (lstrlenW(dir) + 16 >= MAX_PATH) return 1;
+              lstrcpyW(target, dir);
+              lstrcatW(target, L"\\bin\\melonDS.exe");
+
+              SHELLEXECUTEINFOW sei;
+              ZeroMemory(&sei, sizeof(sei));
+              sei.cbSize = sizeof(sei);
+              sei.lpVerb = L"open";
+              sei.lpFile = target;
+              sei.lpParameters = (cmdLine && *cmdLine) ? cmdLine : NULL;
+              sei.lpDirectory = dir;
+              sei.nShow = nCmdShow ? nCmdShow : SW_SHOWNORMAL;
+              if (!ShellExecuteExW(&sei)) {
+                  MessageBoxW(NULL, L"Could not start bin\\melonDS.exe.", L"melonDS", MB_ICONERROR);
+                  return 1;
+              }
+              return 0;
+          }
+          EOF
+          windres -I src_tree/res -I src_tree/build/res src_tree/build/res/melon.rc -O coff -o launcher_res.o
+          clang -O2 -mwindows -municode launcher.c launcher_res.o -luser32 -lshell32 -o dist/melonDS.exe
+          test -f dist/melonDS.exe
+          if ldd dist/melonDS.exe | grep -qi '/clang64/'; then
+            echo "ERROR: launcher depends on clang64 DLL!"
+            ldd dist/melonDS.exe
+            exit 1
+          fi
+
+          cd dist
+          zip -r -q ../melonDS-Multiplayer-Windows.zip .
+          cd ..
+          cp dist/bin/melonDS.exe melonDS.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: melonDS-Multiplayer-Windows
+          path: melonDS-Multiplayer-Windows.zip
+          retention-days: 7
+
+      - name: Update GitHub Release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          gh release view v1.1-netplay-60fps --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload v1.1-netplay-60fps melonDS-Multiplayer-Windows.zip melonDS.exe --repo "${{ github.repository }}" --clobber
+          } else {
+            Write-Host "Release v1.1-netplay-60fps not found yet, skipping upload."
+          }
+          exit 0

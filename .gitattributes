@@ -1,0 +1,7 @@
+*.patch -text
+CMakeLists.txt linguist-vendored
+**/CMakeLists.txt linguist-vendored
+*.cmake linguist-vendored
+*.js linguist-vendored
+*.sh linguist-vendored
+*.ps1 linguist-vendored
