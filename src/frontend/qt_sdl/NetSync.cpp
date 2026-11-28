@@ -1,5 +1,5 @@
 /*
-    NetSync: input-delay netplay for melonDS (Mario Party DS style local-wireless games).
+    NetSync: input-delay netplay for melonDS (local-wireless / DS Download Play style games).
     See NetSync.h.
 */
 
@@ -129,7 +129,7 @@ static bool gAutoDelay = false;
 static int gPort = 7090;
 static std::string gAddr;
 static std::string gLocalName;
-static std::string gRoomName = "Mario Party Lobby";
+static std::string gRoomName = "My Lobby";
 static u64 gPassHash = 0;
 static std::string gLobbyUrl = "https://melonds-lobby.crackobdi.workers.dev";
 static bool gPublishLobby = false;

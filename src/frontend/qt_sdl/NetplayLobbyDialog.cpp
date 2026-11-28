@@ -315,7 +315,7 @@ NetplayLobbyDialog::NetplayLobbyDialog(QWidget* parent, int initialTab)
         form->addRow("Room ID (max 4):", idRow);
 
         editRoomName = new QLineEdit(globalCfg.GetQString("Netplay.RoomName"), tab);
-        if (editRoomName->text().isEmpty()) editRoomName->setText("Mario Party");
+        if (editRoomName->text().isEmpty()) editRoomName->setText("My Lobby");
         editRoomName->setMaxLength(32);
         form->addRow("Room Name:", editRoomName);
 
@@ -908,7 +908,7 @@ void NetplayLobbyDialog::onHostStart()
     if (roomId.isEmpty()) roomId = randomRoomId4();
 
     QString roomName = editRoomName->text().trimmed();
-    if (roomName.isEmpty()) roomName = "Mario Party";
+    if (roomName.isEmpty()) roomName = "My Lobby";
 
     QStringList args;
     args << "--netsync" << "host"

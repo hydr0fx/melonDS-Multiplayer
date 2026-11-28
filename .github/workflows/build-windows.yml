@@ -78,7 +78,7 @@ jobs:
       - name: Package clean Windows release zip
         run: |
           mkdir -p dist/bin "dist/BIOS and ROM"
-          printf "Put your DS files here:\r\n- bios7.bin\r\n- bios9.bin\r\n- firmware.bin\r\n- Your .nds game (e.g. Mario Party DS)\r\n" > "dist/BIOS and ROM/PUT_BIOS_AND_ROM_HERE.txt"
+          printf "Put your DS files here:\r\n- bios7.bin\r\n- bios9.bin\r\n- firmware.bin\r\n- Your .nds game\r\n" > "dist/BIOS and ROM/PUT_BIOS_AND_ROM_HERE.txt"
           cp src_tree/build/melonDS.exe dist/bin/
           windeployqt6 --release --no-translations --no-compiler-runtime dist/bin/melonDS.exe
           ldd dist/bin/melonDS.exe | awk '/\/clang64\/bin\// {print $3}' | xargs -I{} cp -n {} dist/bin/

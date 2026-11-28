@@ -1,5 +1,5 @@
 /*
-    NetSync: input-delay netplay for melonDS (Mario Party DS style local-wireless games).
+    NetSync: input-delay netplay for melonDS (local-wireless / DS Download Play style games).
 
     Every PC runs ALL DS instances locally in deterministic emulated-time lockstep
     (connected through DeterministicMP, zero OS thread timing dependency),

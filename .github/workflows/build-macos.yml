@@ -77,7 +77,7 @@ jobs:
           codesign --force --deep --sign - melonDS.app
           codesign --verify --deep --strict melonDS.app
           mkdir -p "pkg_stage/BIOS and ROM"
-          printf "Put your DS files here:\n- bios7.bin\n- bios9.bin\n- firmware.bin\n- Your .nds ROM (e.g. Mario Party DS)\n" > "pkg_stage/BIOS and ROM/PUT_BIOS_AND_ROM_HERE.txt"
+          printf "Put your DS files here:\n- bios7.bin\n- bios9.bin\n- firmware.bin\n- Your .nds ROM\n" > "pkg_stage/BIOS and ROM/PUT_BIOS_AND_ROM_HERE.txt"
           mv melonDS.app pkg_stage/
           cd pkg_stage
           zip -r -y ../../../melonDS-Multiplayer-macOS.zip "BIOS and ROM" melonDS.app

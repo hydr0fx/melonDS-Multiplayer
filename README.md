@@ -1,6 +1,8 @@
 # melonDS Multiplayer
 
-NDS games online with **2–4 friends** — including **DS Download Play** for games like *Mario Party DS*, *Mario Kart DS*, *New Super Mario Bros.*, and more.
+Play Nintendo DS games online with **2–4 friends** — including games that use **DS Download Play** / local wireless.
+
+> **No games or system files are included.** You need your own legally obtained copies of the BIOS, firmware and game files (e.g. dumped from your own console). Nothing here links to or provides ROMs or BIOS files.
 
 ## Features
 - **Simple Host & Join:** Create a room with a 4-digit Room Code (optional password)
@@ -32,13 +34,14 @@ NDS games online with **2–4 friends** — including **DS Download Play** for g
 
 ![Step 4 - Join Room](docs/join.png)
 
-8. **In-Game (Download Play):** Host opens *Multiplayer → Host → Find Players*, and everyone else opens *DS Download Play* from the DS home screen:
-
-![Step 5 - In-Game](docs/ingame.png)
+8. **In-Game (Download Play):** If the game uses DS Download Play, the host starts the multiplayer / wireless mode in the game, and everyone else opens *DS Download Play* from the DS home screen.
 
 ## Quick Tips
 - **Laptops & MacBooks:** Plug in your charger and turn off **Low Power / Battery Saver** mode for better perfomance.
 - **Firewall:** Allow `melonDS` in the Windows / macOS firewall popup when asked.
+
+## Disclaimer
+This is an unofficial, fan-made project and is **not affiliated with, endorsed by, or sponsored by Nintendo**. All trademarks and game titles belong to their respective owners. No copyrighted game data, BIOS or firmware is distributed.
 
 ## License
 Open-source fork of [melonDS](https://github.com/melonDS-emu/melonDS), licensed under GPLv3 ([LICENSE](LICENSE)).

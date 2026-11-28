@@ -124,7 +124,7 @@ DefaultList<std::string> DefaultStrings =
     {"DLDI.ImagePath",                  "dldi.bin"},
     {"DSi.SD.ImagePath",                "dsisd.bin"},
     {"Instance*.Firmware.Username",     "melonDS"},
-    {"Netplay.RoomName",                "Mario Party Lobby"},
+    {"Netplay.RoomName",                "My Lobby"},
     {"Netplay.LobbyURL",                "https://melonds-lobby.crackobdi.workers.dev"},
 };
 
