@@ -1644,7 +1644,7 @@ bool Start(const std::string& romPath, std::string& error)
                 }
                 std::string reason;
                 if (!r.ok || magic != kMagic) reason = "Netplay protocol mismatch. All players must use melonDS Multiplayer.";
-                else if (ver != kVersion) reason = "Netplay version mismatch (host v" + std::to_string(kVersion) + ", client v" + std::to_string(ver) + ").";
+                else if (ver != kVersion) reason = "Netplay version mismatch (host v" + std::to_string(kVersion) + ", client v" + std::to_string(ver) + "). Please make sure everyone updates to the latest version on GitHub.";
                 else if (gPassHash != 0 && ph != gPassHash) reason = "Wrong room password.";
                 else if (rh != gRomHash) reason = "ROM mismatch with host. Every player must use the exact same ROM file.";
                 else if (b7 != gBios7Hash || b9 != gBios9Hash) reason = "BIOS mismatch (bios7.bin / bios9.bin) with host.";
