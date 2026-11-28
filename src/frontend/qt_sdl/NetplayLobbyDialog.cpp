@@ -360,7 +360,7 @@ NetplayLobbyDialog::NetplayLobbyDialog(QWidget* parent, int initialTab)
 
     refreshTimer = new QTimer(this);
     connect(refreshTimer, &QTimer::timeout, this, &NetplayLobbyDialog::onRefreshLobbies);
-    refreshTimer->start(6000);
+    refreshTimer->start(30000);
 
     refreshMissingWarning();
     onRefreshLobbies();
