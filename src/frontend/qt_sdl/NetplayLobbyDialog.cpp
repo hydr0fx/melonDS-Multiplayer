@@ -63,7 +63,8 @@
 #include <QUrl>
 #include <QVBoxLayout>
 
-static const char* kDefaultLobbyUrl = "https://melonds-lobby.crackobdi.workers.dev";
+static const char* kDefaultLobbyUrl = "http://92.5.184.40:8787";
+static const char* kOldDefaultLobbyUrl = "https://melonds-lobby.crackobdi.workers.dev";
 static const char* kPrivatePrefix = "__priv__:";
 
 static QString randomRoomId4()
@@ -189,7 +190,7 @@ NetplayLobbyDialog::NetplayLobbyDialog(QWidget* parent, int initialTab)
     Config::Table globalCfg = Config::GetGlobalTable();
     Config::Table localCfg = Config::GetLocalTable(0);
     lobbyServerUrl = globalCfg.GetQString("Netplay.LobbyURL").trimmed();
-    if (lobbyServerUrl.isEmpty())
+    if (lobbyServerUrl.isEmpty() || lobbyServerUrl == QString::fromLatin1(kOldDefaultLobbyUrl))
     {
         lobbyServerUrl = QString::fromLatin1(kDefaultLobbyUrl);
         globalCfg.SetQString("Netplay.LobbyURL", lobbyServerUrl);

@@ -131,7 +131,7 @@ static std::string gAddr;
 static std::string gLocalName;
 static std::string gRoomName = "My Lobby";
 static u64 gPassHash = 0;
-static std::string gLobbyUrl = "https://melonds-lobby.crackobdi.workers.dev";
+static std::string gLobbyUrl = "http://92.5.184.40:8787";
 static bool gPublishLobby = false;
 static std::string gPlayerNames[kMaxPlayers];
 static std::vector<u8> gPlayerAvatars[kMaxPlayers];

@@ -125,7 +125,7 @@ DefaultList<std::string> DefaultStrings =
     {"DSi.SD.ImagePath",                "dsisd.bin"},
     {"Instance*.Firmware.Username",     "melonDS"},
     {"Netplay.RoomName",                "My Lobby"},
-    {"Netplay.LobbyURL",                "https://melonds-lobby.crackobdi.workers.dev"},
+    {"Netplay.LobbyURL",                "http://92.5.184.40:8787"},
 };
 
 DefaultList<double> DefaultDoubles =
