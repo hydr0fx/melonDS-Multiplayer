@@ -528,10 +528,13 @@ int main(int argc, char** argv)
             }
         }
 
-        // every PC starts the host DS with the host's save data (or blank SRAM if host has none)
-        const auto& hostsave = NetSync::HostSave();
-        if (!hostsave.empty() && emuInstances[0]->getNDS())
-            emuInstances[0]->getNDS()->SetNDSSave(hostsave.data(), (u32)hostsave.size());
+        // every PC starts each DS instance with that slot's synced save data
+        for (int i = 0; i < nplayers; i++)
+        {
+            const auto& sav = NetSync::PlayerSave(i);
+            if (!sav.empty() && emuInstances[i]->getNDS())
+                emuInstances[i]->getNDS()->SetNDSSave(sav.data(), (u32)sav.size());
+        }
 
         // only show the DS this PC controls; hidden instances skip pixel rasterization and host audio resampling
         for (int i = 0; i < nplayers; i++)

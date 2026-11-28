@@ -60,6 +60,7 @@ void Stop();
 void Abort();
 
 const std::vector<melonDS::u8>& HostSave();
+const std::vector<melonDS::u8>& PlayerSave(int slot);
 
 // Called by the master co-scheduler once per frame per instance, before running the frame.
 // Blocks until the inputs for (inst, frame) are known.

@@ -86,8 +86,9 @@ namespace NetSync
 {
 
 const u32 kMagic = 0x434E5953; // SYNC
-const u32 kVersion = 9;
+const u32 kVersion = 10;
 const int kMaxPlayers = 4;
+const u32 kMaxSaveBytes = 16 * 1024 * 1024;
 const int kRing = 4096;
 const int kRedundantFrames = 16;
 
@@ -191,7 +192,8 @@ static std::atomic<bool> gGo{false};
 static std::atomic<int> gReadyCount{0};
 static std::atomic<bool> gPeerLost{false};
 
-static std::vector<u8> gHostSave;
+static std::vector<u8> gPlayerSaves[kMaxPlayers];
+static std::vector<u8> gLocalSave;
 
 static std::mutex gHashMutex;
 static std::map<u64, u32> gHostHashes;                   // key = (inst<<32)|frame -> hash
@@ -506,7 +508,29 @@ bool DiscoverPublicEndpoint(u16 localUdpPort, std::string& outIp, u16& outMapped
     }
     return false;
 }
-const std::vector<u8>& HostSave() { return gHostSave; }
+const std::vector<u8>& PlayerSave(int slot)
+{
+    static const std::vector<u8> empty;
+    if (slot < 0 || slot >= kMaxPlayers) return empty;
+    return gPlayerSaves[slot];
+}
+const std::vector<u8>& HostSave() { return PlayerSave(0); }
+
+static void LoadLocalSave(const std::string& romPath, std::vector<u8>& out)
+{
+    out.clear();
+    std::string sav = romPath;
+    size_t dot = sav.find_last_of('.');
+    if (dot != std::string::npos) sav = sav.substr(0, dot);
+    sav += ".sav";
+    HashFile(sav, &out);
+    if (out.size() > kMaxSaveBytes)
+    {
+        Log("local save %s too large (%zu bytes), ignoring\n", sav.c_str(), out.size());
+        out.clear();
+    }
+    Log("local save %s: %zu bytes\n", sav.c_str(), out.size());
+}
 
 
 // ---------- packing helpers ----------
@@ -1257,12 +1281,8 @@ bool Start(const std::string& romPath, std::string& error)
         if (!gHost) { FinishLoading(); error = "Could not open host socket (another melonDS instance may still be running)."; return false; }
 
         // host save data, sent to every client so all PCs start identically
-        std::string sav = romPath;
-        size_t dot = sav.find_last_of('.');
-        if (dot != std::string::npos) sav = sav.substr(0, dot);
-        sav += ".sav";
-        HashFile(sav, &gHostSave);
-        Log("host save %s: %zu bytes, roomId=%s\n", sav.c_str(), gHostSave.size(), roomId.c_str());
+        LoadLocalSave(romPath, gPlayerSaves[0]);
+        Log("host save roomId=%s: %zu bytes\n", roomId.c_str(), gPlayerSaves[0].size());
 
         int connected = 1;
         bool startRequested = false;
@@ -1565,6 +1585,7 @@ bool Start(const std::string& romPath, std::string& error)
                             gPlayerConnected[i] = false;
                             gPlayerNames[i].clear();
                             gPlayerAvatars[i].clear();
+                            gPlayerSaves[i].clear();
                             gPeerPingMs[i] = -1;
                             connected--;
                         }
@@ -1614,6 +1635,13 @@ bool Start(const std::string& romPath, std::string& error)
                     r.pos += avLen;
                 }
                 u8 clientArch = r.has(1) ? r.u8_() : 1;
+                u32 savLen = r.has(4) ? r.u32_() : 0;
+                std::vector<u8> clientSave;
+                if (savLen > 0 && savLen <= kMaxSaveBytes && r.need(savLen))
+                {
+                    clientSave.assign(r.p + r.pos, r.p + r.pos + savLen);
+                    r.pos += savLen;
+                }
                 std::string reason;
                 if (!r.ok || magic != kMagic) reason = "Netplay protocol mismatch. All players must use melonDS Multiplayer.";
                 else if (ver != kVersion) reason = "Netplay version mismatch (host v" + std::to_string(kVersion) + ", client v" + std::to_string(ver) + ").";
@@ -1640,12 +1668,13 @@ bool Start(const std::string& romPath, std::string& error)
                 gPlayerArch[slot] = clientArch;
                 gPlayerNames[slot] = clientName.empty() ? ("Player " + std::to_string(slot + 1)) : clientName;
                 gPlayerAvatars[slot] = std::move(clientAvatar);
+                gPlayerSaves[slot] = std::move(clientSave);
                 gPeerPingMs[slot] = -1;
                 connected++;
 
                 Writer w;
                 w.u8_(Msg_Welcome); w.u8_((u8)slot); w.u8_((u8)0); w.u8_((u8)gDelay); w.u8_(gUseJIT ? 1 : 0);
-                w.u32_((u32)gHostSave.size()); w.bytes(gHostSave.data(), gHostSave.size());
+                w.u32_((u32)gPlayerSaves[0].size()); w.bytes(gPlayerSaves[0].data(), gPlayerSaves[0].size());
                 w.u8_(gMultiCard ? 1 : 0);
                 SendTo(ev.peer, w, true);
                 broadcastLobbyStateLocked();
@@ -1703,6 +1732,15 @@ bool Start(const std::string& romPath, std::string& error)
             }
             w.u8_(gUseJIT ? 1 : 0);
             w.u8_(gMultiCard ? 1 : 0);
+            if (gMultiCard)
+            {
+                for (int i = 0; i < gNumPlayers; i++)
+                {
+                    w.u32_((u32)gPlayerSaves[i].size());
+                    if (!gPlayerSaves[i].empty())
+                        w.bytes(gPlayerSaves[i].data(), gPlayerSaves[i].size());
+                }
+            }
             for (int i = 1; i < kMaxPlayers; i++)
                 if (gClientPeers[i]) SendTo(gClientPeers[i], w, true);
             enet_host_flush(gHost);
@@ -1871,6 +1909,8 @@ bool Start(const std::string& romPath, std::string& error)
         if (!gHost) gHost = enet_host_create(nullptr, 1, 2, 0, 0);
         if (!gHost) { FinishLoading(); error = "Could not create network client."; return false; }
 
+        LoadLocalSave(romPath, gLocalSave);
+
         ENetAddress addr;
         enet_address_set_host(&addr, gAddr.c_str());
         addr.port = gPort;
@@ -1898,6 +1938,8 @@ bool Start(const std::string& romPath, std::string& error)
                 w.u32_(avLen);
                 if (avLen > 0) w.bytes(gLocalAvatar.data(), avLen);
                 w.u8_(LocalArch());
+                w.u32_((u32)gLocalSave.size());
+                if (!gLocalSave.empty()) w.bytes(gLocalSave.data(), gLocalSave.size());
                 std::lock_guard<std::mutex> lk(gNetMutex);
                 SendTo(gHostPeer, w, true);
                 enet_host_flush(gHost);
@@ -1935,7 +1977,7 @@ bool Start(const std::string& romPath, std::string& error)
                 {
                     gSlot = r.u8_(); u8 welcomePlayers = r.u8_(); gDelay = r.u8_(); gUseJIT = (r.u8_() != 0);
                     u32 n = r.u32_();
-                    if (r.need(n)) { gHostSave.assign(r.p + r.pos, r.p + r.pos + n); r.pos += n; }
+                    if (r.need(n)) { gPlayerSaves[0].assign(r.p + r.pos, r.p + r.pos + n); r.pos += n; }
                     if (r.has(1)) gMultiCard = (r.u8_() != 0);
                     Log("welcome: slot=%d players=%d delay=%d jit=%d multicard=%d save=%u\n", gSlot, welcomePlayers, gDelay, gUseJIT ? 1 : 0, gMultiCard ? 1 : 0, n);
                     welcomed = true;
@@ -1960,6 +2002,7 @@ bool Start(const std::string& romPath, std::string& error)
                             gPlayerConnected[i] = false;
                             gPlayerNames[i].clear();
                             gPlayerAvatars[i].clear();
+                            gPlayerSaves[i].clear();
                             gPeerPingMs[i] = -1;
                             continue;
                         }
@@ -2006,6 +2049,22 @@ bool Start(const std::string& romPath, std::string& error)
                     }
                     if (r.has(1)) gUseJIT = (r.u8_() != 0);
                     if (r.has(1)) gMultiCard = (r.u8_() != 0);
+                    if (gMultiCard)
+                    {
+                        for (int i = 0; i < gNumPlayers && i < kMaxPlayers; i++)
+                        {
+                            u32 sl = r.has(4) ? r.u32_() : 0;
+                            if (sl > 0 && sl <= kMaxSaveBytes && r.need(sl))
+                            {
+                                gPlayerSaves[i].assign(r.p + r.pos, r.p + r.pos + sl);
+                                r.pos += sl;
+                            }
+                            else
+                            {
+                                gPlayerSaves[i].clear();
+                            }
+                        }
+                    }
                     lobbyStarted = true;
                     if (playerTable) playerTable->hide();
                     if (cancelBtn) cancelBtn->setEnabled(false);
@@ -2189,7 +2248,8 @@ void Stop()
     if (gNetThread.joinable()) gNetThread.join();
     std::lock_guard<std::mutex> lk(gNetMutex);
     gHostPeer = nullptr;
-    for (int i = 0; i < kMaxPlayers; i++) gClientPeers[i] = nullptr;
+    for (int i = 0; i < kMaxPlayers; i++) { gClientPeers[i] = nullptr; gPlayerSaves[i].clear(); }
+    gLocalSave.clear();
     if (gHost)
     {
         enet_host_flush(gHost);

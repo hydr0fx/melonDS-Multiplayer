@@ -1931,7 +1931,7 @@ bool EmuInstance::loadROM(QStringList filepath, bool reset, QString& errorstr)
     std::string origsav = savname;
     savname += instanceFileSuffix();
 
-    bool skipLocalSave = NetSync::Configured() && !NetSync::IsHost();
+    bool skipLocalSave = NetSync::Configured();
     FileHandle* sav = skipLocalSave ? nullptr : Platform::OpenFile(savname, FileMode::Read);
     if (!skipLocalSave)
     {
@@ -2016,8 +2016,10 @@ bool EmuInstance::loadROM(QStringList filepath, bool reset, QString& errorstr)
     }
 
     cartType = 0;
-    if (!skipLocalSave)
+    if (!NetSync::Configured())
         ndsSave = std::make_unique<SaveManager>(savname);
+    else if (instanceID == NetSync::LocalSlot())
+        ndsSave = std::make_unique<SaveManager>(origsav);
 
     return true; // success
 }
